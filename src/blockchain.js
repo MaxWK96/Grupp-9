@@ -59,4 +59,15 @@ class Block {
   }
 }
 
-module.exports = { generateKeyPair, hash, buildMerkleRoot, Block };
+
+// Kollar om ett blocks signatur fortfarande matchar - "verification badge" i UI:t.
+// Använder blockets EGEN publika nyckel, eftersom blocket kan ha skapats
+// av ett annat sjukhus med ett annat nyckelpar.
+function verifyBlockSignature(block) {
+  const verifier = crypto.createVerify('SHA256');
+  verifier.update(block.hash);
+  verifier.end();
+  return verifier.verify(block.publicKey, block.signature, 'hex');
+}
+
+module.exports = { generateKeyPair, hash, buildMerkleRoot, Block, verifyBlockSignature };
