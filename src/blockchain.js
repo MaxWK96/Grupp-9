@@ -70,4 +70,35 @@ function verifyBlockSignature(block) {
   return verifier.verify(block.publicKey, block.signature, 'hex');
 }
 
-module.exports = { generateKeyPair, hash, buildMerkleRoot, Block, verifyBlockSignature };
+class Blockchain {
+  constructor(publicKey, privateKey) {
+    this.publicKey = publicKey;
+    this.privateKey = privateKey;
+    this.chain = [new Block(0, '0', [{ type: 'genesis' }], privateKey, publicKey)];
+  }
+
+  addBlock(logEntries) {
+    const previousBlock = this.chain[this.chain.length - 1];
+    const newBlock = new Block(this.chain.length, previousBlock.hash, logEntries, this.privateKey, this.publicKey);
+    this.chain.push(newBlock);
+    return newBlock;
+  }
+
+  // Kollar att alla block faktiskt hänger ihop.
+  isChainValid(chain) {
+    for (let i = 1; i < chain.length; i++) {
+      if (chain[i].previousHash !== chain[i - 1].hash) return false;
+    }
+    return true;
+  }
+
+  // "Längsta kedjan vinner" - används av P2P-lagret vid sync mellan sjukhus.
+  replaceChain(newChain) {
+    if (newChain.length <= this.chain.length) return false;
+    if (!this.isChainValid(newChain)) return false;
+    this.chain = newChain;
+    return true;
+  }
+}
+
+module.exports = { Blockchain, generateKeyPair, verifyBlockSignature };
