@@ -34,4 +34,29 @@ function buildMerkleRoot(entries) {
   return hashes[0] || hash('empty');
 }
 
-module.exports = { generateKeyPair, hash, buildMerkleRoot };
+class Block {
+  constructor(index, previousHash, logEntries, privateKey, publicKey) {
+    this.index = index;
+    this.timestamp = Date.now();
+    this.previousHash = previousHash;
+    this.logEntries = logEntries; // vem som tittade på vad
+    this.merkleRoot = buildMerkleRoot(logEntries);
+    this.hash = this.calculateHash();
+    this.signature = this.sign(privateKey);
+    // Blocket bär med sig signerarens publika nyckel så vilken server som helst kan verifiera det sen.
+    this.publicKey = publicKey;
+  }
+
+  calculateHash() {
+    return hash(this.index + this.timestamp + this.previousHash + this.merkleRoot);
+  }
+
+  sign(privateKey) {
+    const signer = crypto.createSign('SHA256');
+    signer.update(this.hash);
+    signer.end();
+    return signer.sign(privateKey, 'hex');
+  }
+}
+
+module.exports = { generateKeyPair, hash, buildMerkleRoot, Block };
