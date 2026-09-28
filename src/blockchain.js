@@ -35,9 +35,9 @@ function buildMerkleRoot(entries) {
 }
 
 class Block {
-  constructor(index, previousHash, logEntries, privateKey, publicKey) {
+  constructor(index, previousHash, logEntries, privateKey, publicKey, timestamp = Date.now()) {
     this.index = index;
-    this.timestamp = Date.now();
+    this.timestamp = timestamp;
     this.previousHash = previousHash;
     this.logEntries = logEntries; // vem som tittade på vad
     this.merkleRoot = buildMerkleRoot(logEntries);
@@ -74,7 +74,7 @@ class Blockchain {
   constructor(publicKey, privateKey) {
     this.publicKey = publicKey;
     this.privateKey = privateKey;
-    this.chain = [new Block(0, '0', [{ type: 'genesis' }], privateKey, publicKey)];
+    this.chain = [new Block(0, '0', [{ type: 'genesis' }], privateKey, publicKey, 0)];
   }
 
   addBlock(logEntries) {
