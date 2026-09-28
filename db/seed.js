@@ -1,9 +1,7 @@
 const db = require('../config/db');
 
-// wait a bit to make sure tables are created first
 setTimeout(function () {
 
-  // add some test users
   db.run(`INSERT INTO users (name, username, password, role) VALUES (?, ?, ?, ?)`,
     ['Dr. Smith', 'drsmith', '1234', 'doctor']);
 
@@ -19,7 +17,6 @@ setTimeout(function () {
   db.run(`INSERT INTO users (name, username, password, role) VALUES (?, ?, ?, ?)`,
     ['Random Guy', 'randomguy', '1234', 'unauthorized']);
 
-  // add a patient linked to John Doe (user id 4, since he was the 4th one added)
   db.run(`INSERT INTO patients (name, personal_number, user_id) VALUES (?, ?, ?)`,
     ['John Doe', '199001011234', 4]);
 
