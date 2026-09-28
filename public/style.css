@@ -1,0 +1,9 @@
+body { font-family: system-ui, sans-serif; background: #f4f5f7; margin: 0; padding: 2rem; }
+.card { background: white; border-radius: 8px; padding: 1.5rem; max-width: 600px; margin: 0 auto 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.topbar { max-width: 600px; margin: 0 auto 1rem; display: flex; justify-content: space-between; }
+input, select, textarea, button { font-size: 1rem; padding: .4rem; margin: .3rem 0; display: block; width: 100%; box-sizing: border-box; }
+button { cursor: pointer; width: auto; }
+.error { color: #c0392b; }
+.badge-ok { color: #27ae60; font-weight: bold; }
+.badge-bad { color: #c0392b; font-weight: bold; }
+.note-form { border-top: 1px solid #eee; margin-top: 1rem; padding-top: 1rem; }
