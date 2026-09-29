@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>P2P WebSocket Demo</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #111827;
+        color: #f9fafb;
+        margin: 2rem;
+      }
+
+      #log {
+        background: #1f2937;
+        border: 1px solid #374151;
+        border-radius: 8px;
+        padding: 1rem;
+        min-height: 180px;
+        white-space: pre-wrap;
+      }
+
+      button {
+        margin-top: 1rem;
+        padding: 0.7rem 1.2rem;
+        border: none;
+        border-radius: 6px;
+        background: #2563eb;
+        color: white;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>P2P WebSocket Client</h1>
+    <div id="log">Connecting...</div>
+    <button id="sendBtn">Send test message</button>
+
+    <script>
+      const log = document.getElementById('log');
+      const sendBtn = document.getElementById('sendBtn');
+      const socket = new WebSocket('ws://' + window.location.host);
+
+      socket.addEventListener('open', () => {
+        log.textContent += '\nConnected to WebSocket server.\n';
+      });
+
+      socket.addEventListener('message', (event) => {
+        const data = event.data;
+        log.textContent += `\nReceived: ${data}\n`;
+      });
+
+      socket.addEventListener('close', () => {
+        log.textContent += '\nConnection closed.\n';
+      });
+
+      socket.addEventListener('error', () => {
+        log.textContent += '\nWebSocket error.\n';
+      });
+
+      sendBtn.addEventListener('click', () => {
+        const payload = JSON.stringify({
+          type: 'ping',
+          from: 'browser',
+          at: new Date().toISOString(),
+        });
+
+        socket.send(payload);
+        log.textContent += `\nSent: ${payload}\n`;
+      });
+    </script>
+  </body>
+</html>
