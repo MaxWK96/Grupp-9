@@ -1,7 +1,16 @@
 
 const db = require('../config/db');
+const chain = require('../src/chain');
 
-function logAccess(userId, patientId, action) {
+// Lägger varje logghändelse i ett eget signerat block. Kedjan sparar sig själv och
+// meddelar anslutna webbläsare (se src/chain.js).
+function addToChain(userId, userName, patientId, action) {
+  const block = chain.addBlock([{ userId, userName, patientId, action, timestamp: Date.now() }]);
+  console.log(`[Chain] Block #${block.index} added for "${action}" on patient ${patientId}`);
+}
+
+function logAccess(userId, patientId, action, userName) {
+  addToChain(userId, userName, Number(patientId), action);
 
   db.run(
     `INSERT INTO access_logs (user_id, patient_id, action) VALUES (?, ?, ?)`,
@@ -22,7 +31,7 @@ function auditLogger(action) {
     const patientId = req.params.id || req.body.patientId;
 
     if (userId && patientId) {
-      logAccess(userId, patientId, action);
+      logAccess(userId, patientId, action, req.session.name);
     }
 
     next();
