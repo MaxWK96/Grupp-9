@@ -4,10 +4,10 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-  "dev": "nodemon server.js",
-  "start": "node server.js",
-  "seed": "node db/seed.js"
-},
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "seed": "node db/seed.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MaxWK96/Grupp-9.git"
@@ -23,6 +23,7 @@
   "dependencies": {
     "dotenv": "^18.0.4",
     "express": "^5.2.1",
+    "express-session": "^1.19.0",
     "sqlite3": "^6.0.1"
   },
   "devDependencies": {
