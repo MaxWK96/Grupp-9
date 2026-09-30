@@ -1,0 +1,32 @@
+{
+  "name": "grupp-9",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "seed": "node db/seed.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MaxWK96/Grupp-9.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/MaxWK96/Grupp-9/issues"
+  },
+  "homepage": "https://github.com/MaxWK96/Grupp-9#readme",
+  "dependencies": {
+    "dotenv": "^18.0.4",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
