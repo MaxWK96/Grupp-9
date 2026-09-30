@@ -1,42 +1,46 @@
 // Hämta verktyg från react
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
-// lägger till /api framför alla fetch-anrop, och skickar med x-username-headern
+// lägger till /api framför alla fetch-anrop. Servern vet vem man är via session-cookien,
+// som webbläsaren skickar med automatiskt.
 function api(path, options = {}) {
-  const user = JSON.parse(localStorage.getItem('user') || 'null');
   return fetch(`/api${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'x-username': user ? user.username : '',
       ...(options.headers || {})
     }
-    // access denied om servern svarar med 403 eller om den returnerar { error: 'ACCESS_DENIED' }
+    // access denied om servern svarar med 403, övriga fel kastas med serverns meddelande
   }).then(async (r) => {
     const data = await r.json();
-    if (r.status === 403 || data.error === 'ACCESS_DENIED') throw new Error('ACCESS_DENIED');
+    if (r.status === 403) throw new Error('ACCESS_DENIED');
+    if (!r.ok) throw new Error(data.message);
     return data;
   });
 }
 
-// Visar en dropdown med alla användare som kan logga in och en knapp för att logga in. 
+// Visar en dropdown med alla användare som kan logga in, ett lösenordsfält och en knapp för att logga in.
 // När man loggar in sparas användaren i localStorage och skickas upp till App-komponenten via onLogin.
 function LoginPage({ onLogin }) {
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const users = ['lakare_lisa', 'ssk_sara', 'vardcentral_x', 'patient_anna', 'obehorig_ove'];
+  const users = ['drsmith', 'nursejoy', 'clinic1', 'johndoe', 'randomguy'];
 
   const submit = async (e) => {
     e.preventDefault();
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username })
-    });
-    const data = await res.json();
-    if (data.error) return setError(data.error);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    onLogin(data.user);
+    try {
+      const data = await api('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      });
+      // servern svarar { message, role, name }, så användarobjektet byggs ihop här
+      const user = { username, name: data.name, role: data.role };
+      localStorage.setItem('user', JSON.stringify(user));
+      onLogin(user);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
@@ -47,6 +51,7 @@ function LoginPage({ onLogin }) {
           <option value="">Välj användare</option>
           {users.map((u) => <option key={u} value={u}>{u}</option>)}
         </select>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Lösenord" />
         <button type="submit">Logga in</button>
       </form>
       {error && <p className="error">{error}</p>}
@@ -89,39 +94,61 @@ function SearchPage({ onSelectPatient }) {
 // Visar en patients journal med anteckningar och åtkomstloggar.
 function PatientView({ patientId, user }) {
   const [data, setData] = useState(null);
-  const [logs, setLogs] = useState([]);
+  const [chainLogs, setChainLogs] = useState([]);
   const [note, setNote] = useState('');
-  const [visibility, setVisibility] = useState('all');
+  const [visibility, setVisibility] = useState('everyone');
   const [denied, setDenied] = useState(false);
+  // Sätts när vi själva sparar en anteckning, så vi inte laddar om journalen två gånger
+  // (en gång efter vår POST och en gång när servern skickar note-added).
+  const skipNextNoteEvent = useRef(false);
 
-  // Hämtar journaldata och åtkomstloggar från servern. 
+  // Hämtar journalen från servern. Svaret innehåller { patient, notes, logs }.
   // Om servern svarar med ACCESS_DENIED sätts denied=true och AccessDenied-komponenten visas.
+  // OBS: varje journalhämtning loggas och skapar ett nytt block i kedjan.
   const load = async () => {
     try {
       const journal = await api(`/patients/${patientId}`);
       setData(journal);
-      const logData = await api(`/patients/${patientId}/access-logs`);
-      setLogs(logData);
     } catch {
       setDenied(true);
     }
   };
-    // Kör load() när sidan visas, och igen om patientId ändras.
-  useEffect(() => { load(); }, [patientId]);
 
-  // Socket.io-anslutning som lyssnar på nya anteckningar/block från båda sjukhusservrarna
+  // Hämtar åtkomstloggarna ur blockkedjan, med verified per logg. Skapar INTE något nytt block.
+  const loadChain = async () => {
+    try {
+      setChainLogs(await api(`/chain/patient/${patientId}`));
+    } catch {
+      // saknas behörighet visas det redan via load()
+    }
+  };
+
+    // Kör load() när sidan visas, och igen om patientId ändras.
+  useEffect(() => { load().then(loadChain); }, [patientId]);
+
+  // WebSocket-anslutning som lyssnar på händelser från servern.
+  // chain-updated laddar bara om loggarna (inte journalen), annars skulle varje omladdning
+  // skapa ett nytt block, som skapar ett nytt event, som laddar om igen... i all oändlighet.
   useEffect(() => {
-    const socket = io();
-    socket.on('note-added', (n) => { if (n.patientId === patientId) load(); });
-    socket.on('chain-updated', () => load());
-    return () => socket.disconnect();
+    const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const socket = new WebSocket(protocol + location.host);
+    socket.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'chain-updated') loadChain(); // kan gälla vilken patient som helst, t.ex. efter P2P-sync
+      if (msg.type === 'note-added' && msg.patientId === patientId) {
+        if (skipNextNoteEvent.current) skipNextNoteEvent.current = false;
+        else load();
+      }
+    };
+    return () => socket.close();
   }, [patientId]);
 
-  // Skickar POST med texten och vald synlighet, tömmer rutan och laddar om.
+  // Skickar POST med patient, texten och vald synlighet, tömmer rutan och laddar om.
   const addNote = async () => {
-    await api(`/patients/${patientId}/notes`, {
+    skipNextNoteEvent.current = true;
+    await api('/notes', {
       method: 'POST',
-      body: JSON.stringify({ content: note, visibility })
+      body: JSON.stringify({ patientId, content: note, visibility })
     });
     setNote('');
     load();
@@ -133,12 +160,12 @@ function PatientView({ patientId, user }) {
   return (
     <div className="card">
       <h2>{data.patient.name}</h2>
-      <p>Diagnos: {data.patient.diagnosis}</p>
+      <p>Personnummer: {data.patient.personal_number}</p>
 
       <h3>Anteckningar</h3>
       <ul>
         {data.notes.map((n) => (
-          <li key={n.id}><b>{n.author}</b> ({n.visibility}): {n.content}</li>
+          <li key={n.id}><b>{n.author_name}</b> ({n.visibility}): {n.content}</li>
         ))}
       </ul>
 
@@ -148,7 +175,7 @@ function PatientView({ patientId, user }) {
           <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
             <option value="private">Endast jag</option>
             <option value="staff">Vårdpersonal</option>
-            <option value="all">Alla (inkl. patient)</option>
+            <option value="everyone">Alla (inkl. patient)</option>
           </select>
           <button onClick={addNote}>Spara anteckning</button>
         </div>
@@ -156,12 +183,18 @@ function PatientView({ patientId, user }) {
 
       <h3>Åtkomstloggar (blockkedja)</h3>
       <ul>
-        {logs.map((l, i) => (
-          <li key={i}>
-            {new Date(l.timestamp).toLocaleString()} — {l.actor} ({l.role}) — {l.action}{' '}
+        {chainLogs.map((l, i) => (
+          <li key={`${l.blockIndex}-${i}`}>
+            {new Date(l.timestamp).toLocaleString()} — {l.userName} — {l.action}{' '}
             <span className={l.verified ? 'badge-ok' : 'badge-bad'}>
               {l.verified ? '✓ Verifierad' : '✗ Manipulerad!'}
             </span>
+            {/* DEMO: visar att verifieringen upptäcker en ändrad logg */}
+            {user.role !== 'patient' && l.verified && (
+              <button className="demo-tamper" onClick={() => api(`/chain/tamper/${l.blockIndex}`, { method: 'POST' })}>
+                Demo: manipulera
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -175,8 +208,19 @@ function App() {
   const [patientId, setPatientId] = useState(null);
 
   useEffect(() => {
-    if (user && user.role === 'patient') setPatientId(user.patient_id); // direkt till egen journal
+    // en patient skickas direkt till sin egen journal
+    if (user && user.role === 'patient') {
+      api('/patients/me').then((p) => setPatientId(p.id)).catch(() => {});
+    }
   }, [user]);
+
+  // Loggar ut på servern (förstör sessionen) och rensar sedan lokalt.
+  const logout = async () => {
+    await api('/auth/logout', { method: 'POST' }).catch(() => {});
+    localStorage.removeItem('user');
+    setUser(null);
+    setPatientId(null);
+  };
 
   if (!user) return <LoginPage onLogin={setUser} />;
   if (user.role === 'unauthorized') return <AccessDenied />;
@@ -185,7 +229,7 @@ function App() {
     <div>
       <header className="topbar">
         Inloggad som: {user.username} ({user.role})
-        <button onClick={() => { localStorage.removeItem('user'); setUser(null); setPatientId(null); }}>
+        <button onClick={logout}>
           Logga ut
         </button>
       </header>

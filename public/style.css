@@ -7,3 +7,4 @@ button { cursor: pointer; width: auto; }
 .badge-ok { color: #27ae60; font-weight: bold; }
 .badge-bad { color: #c0392b; font-weight: bold; }
 .note-form { border-top: 1px solid #eee; margin-top: 1rem; padding-top: 1rem; }
+.demo-tamper { display: inline-block; font-size: .75rem; padding: .1rem .4rem; margin-left: .5rem; }
