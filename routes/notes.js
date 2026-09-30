@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { requireLogin, canAccessPatient } = require('../middleware/auth');
+const { auditLogger } = require('../middleware/auditLogger');
 
-router.post('/', requireLogin, function (req, res) {
+router.post('/', requireLogin, auditLogger('add_note'), function (req, res) {
   const patientId = req.body.patientId;
   const content = req.body.content;
   const visibility = req.body.visibility;
@@ -30,10 +31,6 @@ router.post('/', requireLogin, function (req, res) {
         res.status(500).json({ message: 'Something went wrong' });
         return;
       }
-
-      db.run(`INSERT INTO access_logs (user_id, patient_id, action) VALUES (?, ?, ?)`,
-        [req.session.userId, patientId, 'add_note']);
-
       res.json({ message: 'Note saved' });
     });
   });
