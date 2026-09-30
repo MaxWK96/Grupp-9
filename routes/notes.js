@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { requireLogin, canAccessPatient } = require('../middleware/auth');
 const { auditLogger } = require('../middleware/auditLogger');
+const realtime = require('../src/realtime');
 
 router.post('/', requireLogin, auditLogger('add_note'), function (req, res) {
   const patientId = req.body.patientId;
@@ -31,6 +32,7 @@ router.post('/', requireLogin, auditLogger('add_note'), function (req, res) {
         res.status(500).json({ message: 'Something went wrong' });
         return;
       }
+      realtime.broadcast({ type: 'note-added', patientId: Number(patientId) });
       res.json({ message: 'Note saved' });
     });
   });

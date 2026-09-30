@@ -34,6 +34,11 @@ function buildMerkleRoot(entries) {
   return hashes[0] || hash('empty');
 }
 
+// Fristående så att den även fungerar på block som kommit in som vanlig JSON från ett annat sjukhus.
+function calculateBlockHash(block) {
+  return hash(block.index + block.timestamp + block.previousHash + block.merkleRoot);
+}
+
 class Block {
   constructor(index, previousHash, logEntries, privateKey, publicKey, timestamp = Date.now()) {
     this.index = index;
@@ -48,7 +53,7 @@ class Block {
   }
 
   calculateHash() {
-    return hash(this.index + this.timestamp + this.previousHash + this.merkleRoot);
+    return calculateBlockHash(this);
   }
 
   sign(privateKey) {
@@ -70,35 +75,77 @@ function verifyBlockSignature(block) {
   return verifier.verify(block.publicKey, block.signature, 'hex');
 }
 
+// Full kontroll av ett block: räknar om merkle-roten och hashen från innehållet innan signaturen kollas.
+// Utan det här skulle någon kunna ändra logEntries men låta hash/signatur vara kvar, och blocket skulle
+// fortfarande se "verifierat" ut.
+function verifyBlock(block) {
+  if (buildMerkleRoot(block.logEntries) !== block.merkleRoot) return false;
+  if (calculateBlockHash(block) !== block.hash) return false;
+  return verifyBlockSignature(block);
+}
+
 class Blockchain {
   constructor(publicKey, privateKey) {
     this.publicKey = publicKey;
     this.privateKey = privateKey;
     this.chain = [new Block(0, '0', [{ type: 'genesis' }], privateKey, publicKey, 0)];
+    this.listeners = [];
+  }
+
+  // Registrera en funktion som körs varje gång kedjan ändras (t.ex. spara till fil, uppdatera GUI, skicka till andra sjukhus).
+  onChange(listener) {
+    this.listeners.push(listener);
+  }
+
+  notifyChange() {
+    this.listeners.forEach((listener) => listener(this.chain));
   }
 
   addBlock(logEntries) {
     const previousBlock = this.chain[this.chain.length - 1];
     const newBlock = new Block(this.chain.length, previousBlock.hash, logEntries, this.privateKey, this.publicKey);
     this.chain.push(newBlock);
+    this.notifyChange();
     return newBlock;
   }
 
-  // Kollar att alla block faktiskt hänger ihop.
+  // Kollar att alla block hänger ihop, att inget innehåll ändrats och att signaturerna stämmer.
   isChainValid(chain) {
+    if (chain[0].hash !== this.chain[0].hash) return false; // samma genesis som vi
     for (let i = 1; i < chain.length; i++) {
       if (chain[i].previousHash !== chain[i - 1].hash) return false;
+      if (!verifyBlock(chain[i])) return false;
     }
     return true;
   }
 
   // "Längsta kedjan vinner" - används av P2P-lagret vid sync mellan sjukhus.
+  // Är kedjorna lika långa vinner den vars sista block har lägst hash, så att alla servrar väljer samma.
+  // Block som bara fanns i vår egen kedja (t.ex. två sjukhus loggade samtidigt) kastas inte bort:
+  // deras loggposter läggs i ett nytt block ovanpå den vinnande kedjan, så ingen åtkomst försvinner ur loggen.
+  // Returnerar true om kedjan byttes ut.
   replaceChain(newChain) {
-    if (newChain.length <= this.chain.length) return false;
+    const ourLast = this.chain[this.chain.length - 1];
+    const theirLast = newChain[newChain.length - 1];
+    const isLonger = newChain.length > this.chain.length;
+    const winsTie = newChain.length === this.chain.length && theirLast.hash < ourLast.hash;
+    if (!isLonger && !winsTie) return false;
     if (!this.isChainValid(newChain)) return false;
+
+    const theirHashes = new Set(newChain.map((block) => block.hash));
+    const orphanedEntries = [];
+    this.chain.forEach((block) => {
+      if (!theirHashes.has(block.hash)) orphanedEntries.push(...block.logEntries);
+    });
+
     this.chain = newChain;
+    if (orphanedEntries.length > 0) {
+      this.addBlock(orphanedEntries); // anropar notifyChange själv
+    } else {
+      this.notifyChange();
+    }
     return true;
   }
 }
 
-module.exports = { Blockchain, generateKeyPair, verifyBlockSignature };
+module.exports = { Blockchain, generateKeyPair, verifyBlockSignature, verifyBlock };
