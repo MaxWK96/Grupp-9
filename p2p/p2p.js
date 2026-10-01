@@ -29,26 +29,51 @@ class P2P {
     }
   }
 
-  async  broadcast (message, sendToSelf = false) {
+  async broadcast(message, sendToSelf = false) {
     const listeners = await this.getListeners();
-    listeners.forEach(async (url) => {
-      if(url !== this.me || sendToSelf) {
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(message),
-          });
+    const recipients = listeners.filter((url) => url !== this.me || sendToSelf);
+    const results = await Promise.allSettled(recipients.map(async (url) => {
+      const response = await fetch(url + 'api/p2p/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message),
+      });
 
-          if (!response.ok) {
-            console.error(`Failed to send message to ${url}: ${response.statusText}`);
-          }
-        } catch (error) {
-          console.error(`Error sending message to ${url}:`, error);
-        }
+      if (!response.ok) {
+        throw new Error(response.statusText || `HTTP ${response.status}`);
       }
-    }); 
+    }));
+
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error(`Error sending message to ${recipients[index]}:`, result.reason);
+      }
+    });
+  }
+
+  async getLongestChain() {
+    const listeners = await this.getListeners();
+    const chains = await Promise.all(listeners
+      .filter((url) => url !== this.me)
+      .map(async (url) => {
+        try {
+          const response = await fetch(`${url}api/chain/raw`);
+          if (!response.ok) {
+            console.error(`Failed to fetch chain from ${url}: ${response.statusText}`);
+            return [];
+          }
+          return await response.json();
+        } catch (error) {
+          console.error(`Error fetching chain from ${url}:`, error);
+          return [];
+        }
+      }));
+
+    return chains.reduce((longestChain, chain) => (
+      chain.length > longestChain.length ? chain : longestChain
+    ), []);
   }
 }
 
-module.exports = P2P;
+const p2p = new P2P();
+module.exports = p2p;
