@@ -11,6 +11,10 @@ const db = new sqlite3.Database(dbFile, function (err) {
   }
 });
 
+db.on('error', function (err) {
+  console.log('Database error (already handled elsewhere):', err.message);
+});
+
 const schema = fs.readFileSync('./db/schema.sql').toString();
 
 db.exec(schema, function (err) {
