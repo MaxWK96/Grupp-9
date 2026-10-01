@@ -17,6 +17,12 @@ router.get('/', requireLogin, function (req, res) {
   res.json(blocks);
 });
 
+router.get('/raw',  function (req, res) {  
+  res.json(chain.chain);
+});
+
+
+
 // Åtkomstloggarna för en patient, hämtade ur blockkedjan. Används av GUI:t för ✓/✗-badgen.
 // Har medvetet ingen auditLogger, annars skulle varje hämtning skapa ett nytt block.
 router.get('/patient/:id', requireLogin, function (req, res) {

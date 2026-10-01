@@ -6,7 +6,7 @@ const realtime = require('./realtime');
 // En enda kedja per server som alla filer delar (require() ger samma objekt varje gång).
 // Kedjan och serverns nyckelpar sparas i data/-mappen, en uppsättning per port, så att två servrar
 // (sjukhus) på samma dator inte skriver över varandras filer och så att kedjan överlever en omstart.
-const PORT = process.env.PORT || 3001;
+const PORT =  process.env.PORT || process.argv[2] || 3001;;
 const dataDir = path.join(__dirname, '..', 'data');
 const keyFile = path.join(dataDir, `keys-${PORT}.json`);
 const chainFile = path.join(dataDir, `chain-${PORT}.json`);
