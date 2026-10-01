@@ -6,6 +6,20 @@ Systemet har fem roller: läkare, sjuksköterska/ambulanspersonal, vårdcentral,
 
 Projektet körs som två separata servrar (simulerar två sjukhus), som synkar sina blockkedjor med varandra via WebSocket.
 
+## Skärmdumpar
+
+**Inloggning**
+<img src="Images/screenshot_1.png" width="300">
+
+**Läkarvy**
+<img src="Images/screenshot_2.png" width="300">
+
+**Patientvy**
+<img src="Images/screenshot_3.png" width="300">
+
+**Åtkomst nekad**
+<img src="Images/screenshot_4.png" width="300">
+
 ## Tech Stack
 
 - Node.js / Express
