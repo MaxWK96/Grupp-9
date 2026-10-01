@@ -223,7 +223,12 @@ function App() {
   };
 
   if (!user) return <LoginPage onLogin={setUser} />;
-  if (user.role === 'unauthorized') return <AccessDenied />;
+
+  // Rubrikraden med logga ut-knappen visas för alla inloggade, även obehöriga, så ingen fastnar.
+  let page;
+  if (user.role === 'unauthorized') page = <AccessDenied />;
+  else if (patientId) page = <PatientView patientId={patientId} user={user} />;
+  else page = <SearchPage onSelectPatient={setPatientId} />;
 
   return (
     <div>
@@ -233,7 +238,7 @@ function App() {
           Logga ut
         </button>
       </header>
-      {patientId ? <PatientView patientId={patientId} user={user} /> : <SearchPage onSelectPatient={setPatientId} />}
+      {page}
     </div>
   );
 }
